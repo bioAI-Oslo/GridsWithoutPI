@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 
 class FFGC(torch.nn.Module):
-    def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l1"):
+    def __init__(self, ng=256, alpha = 0.9, sigma = 1, norm = "l1"):
         super().__init__()
         self.ng = ng
         self.alpha = alpha
@@ -11,16 +11,16 @@ class FFGC(torch.nn.Module):
         self.norm = norm
 
         self.rg  = torch.nn.Sequential(
-            torch.nn.Linear(2, 64, device = device),
+            torch.nn.Linear(2, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(64, 128, device = device),
+            torch.nn.Linear(64, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(128, ng, device = device))
-        
+            torch.nn.Linear(128, ng))
         self.relu = torch.nn.ReLU()
 
         self.similarity_loss_history = []
         self.capacity_loss_history = []
+        self.total_loss_history = []
 
     def norm_relu(self, x):
         rx = self.relu(x)
@@ -52,43 +52,47 @@ class FFGC(torch.nn.Module):
             return -torch.mean(torch.mean(g, dim = 0)**2)
         else:
             raise ValueError
+    
+    def loss_minima(self):
+        return self.alpha-1
 
     def train_step(self, inputs, labels, optimizer):
         optimizer.zero_grad()
         gs = self(inputs)
         similarity_loss = self.alpha*self.similarity_loss(gs, labels)
-        capacity_loss = self.alpha*self.capacity_loss(gs)
+        capacity_loss = (1-self.alpha)*self.capacity_loss(gs)
         loss = similarity_loss + capacity_loss
         loss.backward()
         optimizer.step()
         self.similarity_loss_history.append(similarity_loss.item())
         self.capacity_loss_history.append(capacity_loss.item())
+        self.total_loss_history.append(loss.item())
         return loss
 
     def save(self, path=None):
-        path = "./model.pkl" if path is None else path
+        path = f"./saved-models/{self.__class__.__name__}.pkl" if path is None else path
         with open(path, "wb") as f:
             pickle.dump(self, f)
 
     def load(self, path=None):
-        path = "./model.pkl" if path is None else path
+        path = f"./saved-models/{self.__class__.__name__}.pkl" if path is None else path
         return pickle.loads(open(path, "rb").read())
 
     
 class RNNGC(FFGC):
-    def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l2"):
-        super().__init__(ng, device, alpha, sigma, norm)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         
         # initial state encoder
         self.rg  = torch.nn.Sequential(
-            torch.nn.Linear(2, 64, device = device),
+            torch.nn.Linear(2, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(64, ng, device = device))
+            torch.nn.Linear(64, self.ng))
         
-        self.gg = torch.nn.Linear(ng, ng, device = device, bias = False)
+        self.gg = torch.nn.Linear(self.ng, self.ng, bias = False)
         torch.nn.init.eye_(self.gg.weight)
 
-        self.vg = torch.nn.Linear(2, ng, device = device)
+        self.vg = torch.nn.Linear(2, self.ng)
         self.relu = torch.nn.ReLU()
 
     def recurrent_step(self, g_prev, v):
