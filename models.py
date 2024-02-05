@@ -2,11 +2,12 @@ import torch
 import numpy as np
 
 class FFGC(torch.nn.Module):
-    def __init__(self, ng, device, alpha = 0.5, sigma = 1):
+    def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l1"):
         super().__init__()
         self.ng = ng
         self.alpha = alpha
         self.sigma = sigma
+        self.norm = norm
 
         self.rg  = torch.nn.Sequential(
             torch.nn.Linear(2, 64, device = device),
@@ -40,12 +41,14 @@ class FFGC(torch.nn.Module):
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
-        # g = torch.reshape(g, (-1, g.shape[-1])) ###############
-        # mean_vector = torch.mean(g, dim = (0, 1))
+        g = torch.reshape(g, (-1, g.shape[-1])) ###############
 
-        mean_vector = torch.mean(g, dim = (0, 1))
-        return -torch.mean(mean_vector**2) #####################
-        # return -torch.mean(g) #####################
+        if self.norm == "l1":
+            return -torch.mean(g) # g is non-negative
+        elif self.norm == "l2":
+            return -torch.mean(torch.mean(g, dim = 0)**2)
+        else:
+            raise NotImplementedError
 
     def train_step(self, inputs, labels, optimizer):
         optimizer.zero_grad()
@@ -56,7 +59,7 @@ class FFGC(torch.nn.Module):
         return loss
     
 class RNNGC(FFGC):
-    def __init__(self, ng, device, alpha = 0.5, sigma = 1):
+    def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l2"):
         super().__init__(ng, device, alpha, sigma)
         
         # initial state encoder
@@ -68,7 +71,7 @@ class RNNGC(FFGC):
         self.gg = torch.nn.Linear(ng, ng, device = device, bias = False)
         torch.nn.init.eye_(self.gg.weight)
 
-        self.vg = torch.nn.Linear(2, ng, device = device, bias = False)
+        self.vg = torch.nn.Linear(2, ng, device = device)
         self.relu = torch.nn.ReLU()
 
     def recurrent_step(self, g_prev, v):
