@@ -41,7 +41,7 @@ class FFGC(torch.nn.Module):
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
-        g = torch.reshape(g, (-1, g.shape[-1])) ###############
+        g = torch.reshape(g, (-1, g.shape[-1]))
         if self.norm == "l1":
             return -torch.mean(g) # g is non-negative
         elif self.norm == "l2":
