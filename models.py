@@ -42,13 +42,12 @@ class FFGC(torch.nn.Module):
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
         g = torch.reshape(g, (-1, g.shape[-1])) ###############
-
         if self.norm == "l1":
             return -torch.mean(g) # g is non-negative
         elif self.norm == "l2":
             return -torch.mean(torch.mean(g, dim = 0)**2)
         else:
-            raise NotImplementedError
+            raise ValueError
 
     def train_step(self, inputs, labels, optimizer):
         optimizer.zero_grad()
@@ -60,7 +59,7 @@ class FFGC(torch.nn.Module):
     
 class RNNGC(FFGC):
     def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l2"):
-        super().__init__(ng, device, alpha, sigma)
+        super().__init__(ng, device, alpha, sigma, norm)
         
         # initial state encoder
         self.rg  = torch.nn.Sequential(
