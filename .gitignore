@@ -160,5 +160,7 @@ cython_debug/
 #.idea/
 
 
+# custom ignore
+/saved-models
 # exclude (possibly large) figures
-/figures
+/figures 

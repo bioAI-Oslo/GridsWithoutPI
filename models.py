@@ -1,5 +1,6 @@
 import torch 
 import numpy as np
+import pickle
 
 class FFGC(torch.nn.Module):
     def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l1"):
@@ -17,6 +18,9 @@ class FFGC(torch.nn.Module):
             torch.nn.Linear(128, ng, device = device))
         
         self.relu = torch.nn.ReLU()
+
+        self.similarity_loss_history = []
+        self.capacity_loss_history = []
 
     def norm_relu(self, x):
         rx = self.relu(x)
@@ -52,10 +56,23 @@ class FFGC(torch.nn.Module):
     def train_step(self, inputs, labels, optimizer):
         optimizer.zero_grad()
         gs = self(inputs)
-        loss = self.alpha*self.similarity_loss(gs, labels) + (1-self.alpha)*self.capacity_loss(gs)
+        similarity_loss = self.alpha*self.similarity_loss(gs, labels)
+        capacity_loss = (1 - self.alpha)*self.capacity_loss(gs)
+        loss = similarity_loss + capacity_loss
         loss.backward()
         optimizer.step()
+        self.similarity_loss_history.append(similarity_loss.item())
+        self.capacity_loss_history.append(capacity_loss.item())
         return loss
+
+    def save(self, path=None):
+        path = "./model.pkl" if path is None else path
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    def load(self, path=None):
+        path = "./model.pkl" if path is None else path
+        return pickle.loads(open(path, "rb").read())
     
 class RNNGC(FFGC):
     def __init__(self, ng, device, alpha = 0.5, sigma = 1, norm = "l2"):
@@ -68,9 +85,9 @@ class RNNGC(FFGC):
             torch.nn.Linear(64, ng, device = device))
         
         self.gg = torch.nn.Linear(ng, ng, device = device, bias = False)
-        torch.nn.init.eye_(self.gg.weight)
+        torch.nn.init.eye_(self.gg.weight) # identity initialization
 
-        self.vg = torch.nn.Linear(2, ng, device = device)
+        self.vg = torch.nn.Linear(2, ng, device = device, bias = False)
         self.relu = torch.nn.ReLU()
 
     def recurrent_step(self, g_prev, v):
