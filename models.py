@@ -45,7 +45,7 @@ class FFGC(torch.nn.Module):
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
-        g = torch.reshape(g, (-1, g.shape[-1]))
+        g = torch.reshape(g, (-1, g.shape[-1])) ###############
         if self.norm == "l1":
             return -torch.mean(g) # g is non-negative
         elif self.norm == "l2":
@@ -77,6 +77,7 @@ class FFGC(torch.nn.Module):
     def load(self, path=None):
         path = f"./saved-models/{self.__class__.__name__}.pkl" if path is None else path
         return pickle.loads(open(path, "rb").read())
+
     
 class RNNGC(FFGC):
     def __init__(self, *args, **kwargs):
@@ -91,7 +92,7 @@ class RNNGC(FFGC):
         self.gg = torch.nn.Linear(self.ng, self.ng, bias = False)
         torch.nn.init.eye_(self.gg.weight)
 
-        self.vg = torch.nn.Linear(2, self.ng, bias = False )
+        self.vg = torch.nn.Linear(2, self.ng)
         self.relu = torch.nn.ReLU()
 
     def recurrent_step(self, g_prev, v):
