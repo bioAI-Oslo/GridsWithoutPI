@@ -82,12 +82,6 @@ class RNNGC(FFGC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # initial state encoder
-        self.rg  = torch.nn.Sequential(
-            torch.nn.Linear(2, 64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(64, self.ng))
-        
         self.gg = torch.nn.Linear(self.ng, self.ng, bias = False)
         torch.nn.init.eye_(self.gg.weight)
 
