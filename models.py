@@ -74,8 +74,11 @@ class FFGC(torch.nn.Module):
         self.total_loss_history.append(loss.item())
         return loss
 
+    def name(self):
+        return f"{self.__class__.__name__}_{len(self.total_loss_history)}"
+
     def save(self, path=None):
-        path = f"./saved-models/{self.__class__.__name__}_{len(self.total_loss_history)}.pkl" if path is None else path
+        path = f"./saved-models/{self.name()}.pkl" if path is None else path
         device = self.device
         self.to(torch.device("cpu"))
         with open(path, "wb") as f:
@@ -104,23 +107,20 @@ class FFGC(torch.nn.Module):
         if layer == 'full':
             activity = self(r)
         elif layer > -1:
+            print(self.rg[:layer+1]) # show function composition
             activity = self.rg[:layer+1](r)
         else:
             # domain is the codomain
             activity = r
         activity = activity.detach().cpu().numpy()
         # investigate output unit 
-        if output_unit is not None:
-            # layer might be "relu", so we get the weights from the previous 'layer'
-            try:
-                weight = self.rg[layer+1].weight.detach().cpu().numpy()[output_unit] # (ncells,)
-            except AttributeError:
-                weight = self.rg[layer].weight.detach().cpu().numpy()[output_unit] # (ncells,)
-        else:
-            weight = np.ones(activity.shape[-1])
-        activity = activity * weight # (res*res, ncells)
+        if output_unit is not None and layer != 'full' and layer < len(self.rg) - 1:
+            weight = self.rg[layer+1].weight.detach().cpu().numpy()[output_unit] # (ncells,)
+            print("Pattern formation of output unit", output_unit, "in layer", layer+1)
+            activity = activity * weight # (res*res, ncells)
         # sort by aggregate activity
-        sort_idxs = np.argsort(np.sum(activity, axis = 0))[::-1] if sort_idxs is None else sort_idxs
+        #sort_idxs = np.argsort(np.sum(activity, axis = 0))[::-1] if sort_idxs is None else sort_idxs
+        sort_idxs = np.argsort(np.linalg.norm(activity, axis = 0))[::-1] if sort_idxs is None else sort_idxs
         activity = activity[:,sort_idxs]
         return activity.T.reshape(-1, res, res), sort_idxs
 
