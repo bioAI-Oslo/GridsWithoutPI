@@ -10,7 +10,7 @@ def multiimshow(zz, figsize=(1,1), add_colorbar=True, rect=(0,0,1,0.87), axes_pa
     if add_colorbar:
         grid = ImageGrid(fig, rect=rect, nrows_ncols=(nrows, ncols), axes_pad=axes_pad, cbar_mode='single', cbar_location='right', cbar_pad=0.1, cbar_size='5%')
     vmin, vmax = (np.nanmin(zz), np.nanmax(zz))
-    if vrange is 'symmetric':
+    if vrange == 'symmetric':
         vmax = max(abs(vmin), abs(vmax))
         vmin = -vmax
     kwargs['vmin'] = vmin if 'vmin' not in kwargs else kwargs['vmin']
@@ -20,7 +20,7 @@ def multiimshow(zz, figsize=(1,1), add_colorbar=True, rect=(0,0,1,0.87), axes_pa
         im = ax.imshow(data, **kwargs)
     [ax.axis('off') for ax in grid]
     fig.colorbar(im, cax=grid.cbar_axes[0]) if add_colorbar else None
-    return fig, grid.axes_all
+    return fig, grid.axes_all, {'vmin':vmin, 'vmax':vmax}
 
 
 def set_size(width=345.0, fraction=1, mode="wide"):
