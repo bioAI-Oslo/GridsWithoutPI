@@ -96,7 +96,7 @@ class FFGC(torch.nn.Module):
             path = model_list[-1]
         return pickle.loads(open(path, "rb").read())
 
-    def forward_ratemaps(self, layer, output_unit=None, sort_idxs=None, rmin=-2*np.pi, rmax=2*np.pi, res=64):
+    def forward_ratemaps(self, layer, output_unit=None, sort_idxs=None, rmin=-2*np.pi, rmax=2*np.pi, res=64, verbose=True):
         # define domain
         x = np.linspace(rmin, rmax, res)
         y = np.linspace(rmin, rmax, res)
@@ -107,7 +107,7 @@ class FFGC(torch.nn.Module):
         if layer == 'full':
             activity = self(r)
         elif layer > -1:
-            print(self.rg[:layer+1]) # show function composition
+            print(self.rg[:layer+1]) if verbose else None # show function composition
             activity = self.rg[:layer+1](r)
         else:
             # domain is the codomain
@@ -116,7 +116,7 @@ class FFGC(torch.nn.Module):
         # investigate output unit 
         if output_unit is not None and layer != 'full' and layer < len(self.rg) - 1:
             weight = self.rg[layer+1].weight.detach().cpu().numpy()[output_unit] # (ncells,)
-            print("Pattern formation of output unit", output_unit, "in layer", layer+1)
+            print("Pattern formation of output unit", output_unit, "in layer", layer+1) if verbose else None
             activity = activity * weight # (res*res, ncells)
         # sort by aggregate activity
         #sort_idxs = np.argsort(np.sum(activity, axis = 0))[::-1] if sort_idxs is None else sort_idxs
