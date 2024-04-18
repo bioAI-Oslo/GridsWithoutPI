@@ -1,0 +1,50 @@
+font.family        : sans-serif
+font.serif         : Computer Modern Roman, Times, Palatino, New Century Schoolbook, Bookman
+font.sans-serif    : Arial, Helvetica, Avant Garde, Computer Modern Sans Serif
+#font.cursive       : Zapf Chancery
+#font.monospace     : Courier, Computer Modern Typewriter
+#font.monospace      : Andale Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace
+text.usetex: False
+font.size : 8
+
+# Adapted from https://gist.github.com/huyng/816622
+#axes.facecolor     : eeeeee   # axes background color
+#axes.edgecolor      : bcbcbc   # axes edge color
+#axes.linewidth      : 5        # edge linewidth
+axes.titlepad        : 5
+
+axes.titlesize      : 8  # fontsize of the axes title
+axes.labelsize      : 8    # fontsize of the x any y labels
+#axes.labelcolor     : 555555
+axes.axisbelow      : True     # whether axis gridlines and ticks are below
+                               # the axes elements (lines, text, etc)
+axes.spines.top:    False
+axes.spines.right:  False
+
+# Viridis scheme!
+axes.prop_cycle: cycler("color", ['46327e', '365c8d', '277f8e', '1fa187', '4ac16d', 'a0da39', 'fde725'])
+
+figure.dpi:         300       # figure dots per inch
+
+lines.linewidth : 1
+lines.markersize : 1
+
+image.cmap : viridis
+image.interpolation: None
+legend.frameon : False
+figure.figsize:   1.6, 1.2 # figure size in inches
+figure.autolayout: False
+
+figure.constrained_layout.use: False  # When True, automatically make plot
+figure.constrained_layout.h_pad:  0.02  # Padding around axes objects. Float representing
+figure.constrained_layout.w_pad:  0.02  # inches. Default is 3/72 inches (3 points)
+
+
+savefig.format: svg          # {png, ps, pdf, svg}
+savefig.bbox: tight    # {tight, standard}
+                                # 'tight' is incompatible with pipe-based animation
+                                # backends (e.g. 'ffmpeg') but will work with those
+                                # based on temporary files (e.g. 'ffmpeg_file')
+savefig.pad_inches:   0.0     # Padding to be used when bbox is set to 'tight'
+savefig.transparent: True
+savefig.dpi:  figure

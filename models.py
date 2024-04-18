@@ -21,7 +21,7 @@ class FFGC(torch.nn.Module):
             torch.nn.Linear(128, ng))
         self.relu = torch.nn.ReLU()
 
-        self.similarity_loss_history = []
+        self.distance_loss_history = []
         self.capacity_loss_history = []
         self.CI_loss_history = []
         self.total_loss_history = []
@@ -39,49 +39,20 @@ class FFGC(torch.nn.Module):
         g = self.rg(r)
         return self.norm_relu(g)
 
-    def similarity_loss(self, g, r):
+    def distance_loss(self, g, r):
         # reshape to accomodate FF and RNN
         g = torch.reshape(g, (-1, g.shape[-1])) 
         r = torch.reshape(r, (-1, r.shape[-1]))
         dg = torch.nn.functional.pdist(g) # state distance
         dr = torch.nn.functional.pdist(r) # spatial distance
-        # gaussian similarity difference
-        diff = torch.exp(-dr**2/(2*self.sigma**2)) - torch.exp(-dg**2)
         # loss envelope function
         envelope = torch.exp(-dr**2/(2*(1.5*self.sigma)**2))
-        return torch.mean(diff**2*envelope)
-    
-    def CI_loss(self, g, r):
-
-        # Draw distances dr from gaussian
-        self.CI_scale = 0.1
-        ds = self.CI_scale*abs(torch.randn(r.shape[0], device = self.device))
-        # Draw random angles
-        theta1 = 2*np.pi*torch.rand(r.shape[0], device = self.device)
-        # Draw random angles 2
-        theta2 = 2*np.pi*torch.rand(r.shape[0], device = self.device)
-        # Vectors 1
-        dr1 = ds[...,None]*torch.stack((torch.cos(theta1), torch.sin(theta1)), dim = -1)
-        r1 = r + dr1
-        # Vectors 2
-        dr2 = ds[...,None]*torch.stack((torch.cos(theta2), torch.sin(theta2)), dim = -1)
-        r2 = r + dr2
-        # States 1
-        g1 = self(r1)
-        # States 2
-        g2 = self(r2)
-        # S1
-        s1 = torch.sum((g - g1) ** 2, axis=-1) / torch.maximum(ds**2, torch.tensor(1e-14).to(self.device))
-        # S2
-        s2 = torch.sum((g - g2) ** 2, axis=-1) / torch.maximum(ds**2, torch.tensor(1e-14).to(self.device))
-        # conf_iso_loss = (s1 - s2) ** 2
-        self.scale = self.beta*0.1*256*0.0142/1000
-        conf_iso_loss = (s1*ds**2-ds**2*self.scale) ** 2 + (s2*ds**2-ds**2*self.scale) ** 2
-        return torch.mean(conf_iso_loss)
+        diff = (dg - dr)**2
+        return torch.mean(diff*envelope)
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
-        g = torch.reshape(g, (-1, g.shape[-1])) ###############
+        g = torch.reshape(g, (-1, g.shape[-1])) 
         if self.norm == "l1":
             return -torch.mean(g) # g is non-negative
         elif self.norm == "l2":
@@ -95,14 +66,16 @@ class FFGC(torch.nn.Module):
     def train_step(self, inputs, labels, optimizer):
         optimizer.zero_grad()
         gs = self(inputs)
-        # similarity_loss = self.alpha*self.similarity_loss(gs, labels)
-        CI_loss = self.alpha*self.CI_loss(gs, labels)
+
+        distance_loss = self.alpha*self.distance_loss(gs, labels)
         capacity_loss = (1-self.alpha)*self.capacity_loss(gs)
-        loss = CI_loss + capacity_loss
+        loss = distance_loss + capacity_loss
+
         loss.backward()
         optimizer.step()
-        # self.similarity_loss_history.append(similarity_loss.item())
-        self.CI_loss_history.append(CI_loss.item())
+        
+        # log losses 
+        self.distance_loss_history.append(distance_loss.item())
         self.capacity_loss_history.append(capacity_loss.item())
         self.total_loss_history.append(loss.item())
         return loss
