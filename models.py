@@ -2,16 +2,19 @@ import torch
 import numpy as np
 import pickle
 import os
+import matplotlib.pyplot as plt
 
 class FFGC(torch.nn.Module):
-    def __init__(self, ng=256, alpha = 0.88, sigma = 1, norm = "l1"):
+    def __init__(self, ng=256, alpha = 0.88, sigma = 1, rho = 1, norm = "l1"):
         super().__init__()
         self.ng = ng
         self.alpha = alpha
         self.sigma = sigma
+        self.rho = rho # sets the rate
         self.norm = norm
-        # self.beta = torch.nn.Parameter(torch.tensor(1.0), requires_grad = True)
-        self.beta = 1.0
+        hex_scale = 3*np.pi*ng
+        self.beta = torch.nn.Parameter(torch.tensor(hex_scale, dtype=torch.float32), requires_grad=False)
+        #self.sigma = torch.nn.Parameter(torch.tensor(sigma, dtype=torch.float32), requires_grad=True)
 
         self.rg  = torch.nn.Sequential(
             torch.nn.Linear(2, 64),
@@ -25,6 +28,7 @@ class FFGC(torch.nn.Module):
         self.capacity_loss_history = []
         self.CI_loss_history = []
         self.total_loss_history = []
+        self.betas = []
 
     @property
     def device(self):
@@ -39,7 +43,21 @@ class FFGC(torch.nn.Module):
         g = self.rg(r)
         return self.norm_relu(g)
 
-    def distance_loss(self, g, r):
+    def plot_envelope(self, fig=None, ax=None, ab=2*np.pi, res=64, **kwargs):
+        if fig is None or ax is None:
+            fig, ax = plt.subplots()
+        mesh = np.linspace(-ab, ab, res)
+        xx, yy = np.meshgrid(mesh, mesh)
+        r = np.stack((xx,yy), axis = -1).reshape(-1, 2)
+        r = torch.tensor(r.astype('float32'), device = self.device)
+        r0 = r[res**2//2 + res//2]
+        #envelope = torch.exp(-torch.sum((r - r0)**2, axis = 1)/(2*(1.5*self.sigma)**2)).detach().cpu().numpy()
+        envelope = torch.distributions.normal.Normal(0, self.sigma).log_prob(torch.linalg.norm(r - r0, dim = 1)).detach().cpu().numpy()
+        envelope = np.exp(envelope)
+        im = ax.imshow(envelope.reshape(res, res), **kwargs)
+        return fig, ax, im
+
+    def distance_loss_old(self, g, r):
         # reshape to accomodate FF and RNN
         g = torch.reshape(g, (-1, g.shape[-1])) 
         r = torch.reshape(r, (-1, r.shape[-1]))
@@ -49,6 +67,24 @@ class FFGC(torch.nn.Module):
         envelope = torch.exp(-dr**2/(2*(1.5*self.sigma)**2))
         diff = (dg - dr)**2
         return torch.mean(diff*envelope)
+
+    def distance_loss(self, g, r):
+        # reshape to accomodate FF and RNN
+        g = torch.reshape(g, (-1, g.shape[-1])) 
+        r = torch.reshape(r, (-1, r.shape[-1]))
+        perturbed_r = r + self.sigma*torch.randn(r.shape, device = self.device)
+        # randomly rotate r
+        #angle = torch.rand(r.shape[0], device = self.device)*2*np.pi
+        #perturbed_r = r + torch.stack((torch.cos(angle), torch.sin(angle)), axis = -1)
+        perturbed_g = self(perturbed_r)
+        dr = torch.sum((r - perturbed_r)**2, axis = 1) # spatial distance
+        dg = torch.sum((g - perturbed_g)**2, axis = 1) # state distance
+        envelope = torch.distributions.normal.Normal(0, self.sigma).log_prob(dr)
+        envelope = torch.exp(envelope) / torch.exp(torch.distributions.normal.Normal(0, self.sigma).log_prob(torch.tensor(0.)))
+        diff = envelope*(self.beta*dg - dr)**2
+        #diff = (dg - dr)**2
+        #diff = (self.beta*dg - dr)**2
+        return torch.mean(diff)
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
@@ -78,6 +114,7 @@ class FFGC(torch.nn.Module):
         self.distance_loss_history.append(distance_loss.item())
         self.capacity_loss_history.append(capacity_loss.item())
         self.total_loss_history.append(loss.item())
+        self.betas.append(self.beta.item())
         return loss
 
     def name(self):
