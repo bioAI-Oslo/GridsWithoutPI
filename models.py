@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import pickle
 import os
+
+# from functorch import jacrev, vmap
 import matplotlib.pyplot as plt
 
 class FFGC(torch.nn.Module):
@@ -12,6 +14,8 @@ class FFGC(torch.nn.Module):
         self.sigma = sigma
         self.rho = rho # sets the rate
         self.norm = norm
+        self.j_scale = torch.nn.Parameter(torch.tensor(1.0), requires_grad = True)
+        # self.beta = 1.0
         hex_scale = 3*np.pi*ng
         self.beta = torch.nn.Parameter(torch.tensor(hex_scale, dtype=torch.float32), requires_grad=False)
         #self.sigma = torch.nn.Parameter(torch.tensor(sigma, dtype=torch.float32), requires_grad=True)
@@ -67,6 +71,14 @@ class FFGC(torch.nn.Module):
         envelope = torch.exp(-dr**2/(2*(1.5*self.sigma)**2))
         diff = (dg - dr)**2
         return torch.mean(diff*envelope)
+    
+    def jacobi_CI_loss(self, r):
+        # Batched Jacobian
+        J = torch.vmap(torch.func.jacfwd(self.forward))(r.requires_grad_())
+        # Batched J.T @ J
+        m = torch.matmul(J.permute(0, 2, 1), J)
+        loss = torch.mean((m - torch.eye(m.shape[-1], device = m.device))**2)
+        return loss
 
     def distance_loss(self, g, r):
         # reshape to accomodate FF and RNN
@@ -104,6 +116,7 @@ class FFGC(torch.nn.Module):
         gs = self(inputs)
 
         distance_loss = self.alpha*self.distance_loss(gs, labels)
+        # distance_loss = self.alpha*self.jacobi_CI_loss(labels)
         capacity_loss = (1-self.alpha)*self.capacity_loss(gs)
         loss = distance_loss + capacity_loss
 
