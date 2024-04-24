@@ -54,41 +54,16 @@ class FFGC(torch.nn.Module):
         im = ax.imshow(envelope.reshape(res, res), **kwargs)
         return fig, ax, im
 
-    def distance_loss_old(self, g, r):
+    def distance_loss(self, g, r):
         # reshape to accomodate FF and RNN
         g = torch.reshape(g, (-1, g.shape[-1])) 
         r = torch.reshape(r, (-1, r.shape[-1]))
         dg = torch.nn.functional.pdist(g) # state distance
         dr = torch.nn.functional.pdist(r) # spatial distance
         # loss envelope function
-        envelope = torch.exp(-dr**2/(2*(1.5*self.sigma)**2))
+        envelope = torch.exp(-dr**2/(2*self.sigma**2))
         diff = (dg - dr)**2
         return torch.mean(diff*envelope)
-    
-    def jacobi_CI_loss(self, r):
-        m = self.metric_tensor(r)
-        loss = torch.mean((self.rho*m - torch.eye(m.shape[-1], device = m.device))**2)
-        return loss
-
-    def metric_tensor(self, r):
-        # Batched Jacobian
-        J = torch.vmap(torch.func.jacfwd(self.forward))(r)#.requires_grad_())
-        # Batched J.T @ J
-        m = torch.matmul(J.permute(0, 2, 1), J)
-        return m
-
-    def distance_loss(self, g, r):
-        # reshape to accomodate FF and RNN
-        g = torch.reshape(g, (-1, g.shape[-1])) 
-        r = torch.reshape(r, (-1, r.shape[-1]))
-        perturbed_r = r + np.sqrt(self.sigma)*torch.randn(r.shape, device = self.device)
-        perturbed_g = self(perturbed_r)
-        dr = torch.sum((r - perturbed_r)**2, axis = 1) # spatial distance
-        dg = torch.sum((g - perturbed_g)**2, axis = 1) # state distance
-        envelope = torch.distributions.normal.Normal(0, self.sigma).log_prob(dr)
-        envelope = torch.exp(envelope) / torch.exp(torch.distributions.normal.Normal(0, self.sigma).log_prob(torch.tensor(0.)))
-        diff = envelope*(dg - self.rho*dr)**2
-        return torch.mean(diff)
 
     def capacity_loss(self, g):
         # reshape to accomodate FF and RNN
@@ -108,7 +83,6 @@ class FFGC(torch.nn.Module):
         gs = self(inputs)
 
         distance_loss = self.alpha*self.distance_loss(gs, labels)
-        #distance_loss = self.alpha*self.jacobi_CI_loss(labels)
         capacity_loss = (1-self.alpha)*self.capacity_loss(gs)
         loss = distance_loss + capacity_loss
 
@@ -179,9 +153,7 @@ class RNNGC(FFGC):
         
         self.gg = torch.nn.Linear(self.ng, self.ng, bias = False)
         torch.nn.init.eye_(self.gg.weight)
-
-        self.vg = torch.nn.Linear(2, self.ng)
-        self.relu = torch.nn.ReLU()
+        self.vg = torch.nn.Linear(2, self.ng, bias = False)
 
     def recurrent_step(self, g_prev, v):
         h = self.gg(g_prev) + self.vg(v)
@@ -197,3 +169,28 @@ class RNNGC(FFGC):
             g.append(self.recurrent_step(g[-1], v[:,i]))
         return torch.stack(g, dim = 1)
     
+    # def jacobi_CI_loss(self, r):
+    #     m = self.metric_tensor(r)
+    #     loss = torch.mean((self.rho*m - torch.eye(m.shape[-1], device = m.device))**2)
+    #     return loss
+
+    # def metric_tensor(self, r):
+    #     # Batched Jacobian
+    #     J = torch.vmap(torch.func.jacfwd(self.forward))(r)#.requires_grad_())
+    #     # Batched J.T @ J
+    #     m = torch.matmul(J.permute(0, 2, 1), J)
+    #     return m
+
+    # def distance_loss(self, g, r):
+    #     # reshape to accomodate FF and RNN
+    #     g = torch.reshape(g, (-1, g.shape[-1])) 
+    #     r = torch.reshape(r, (-1, r.shape[-1]))
+    #     perturbed_r = r + np.sqrt(self.sigma)*torch.randn(r.shape, device = self.device)
+    #     perturbed_g = self(perturbed_r)
+    #     dr = torch.sum((r - perturbed_r)**2, axis = 1) # spatial distance
+    #     dg = torch.sum((g - perturbed_g)**2, axis = 1) # state distance
+    #     # envelope = torch.distributions.normal.Normal(0, self.sigma).log_prob(dr)
+    #     #envelope = torch.exp(envelope) / torch.exp(torch.distributions.normal.Normal(0, self.sigma).log_prob(torch.tensor(0.)))
+    #     envelope = torch.exp(-dr**2/(2*(1.5*self.sigma)**2))
+    #     diff = envelope*(dg - self.rho*dr)**2
+    #     return torch.mean(diff)
