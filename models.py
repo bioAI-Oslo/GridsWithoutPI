@@ -5,7 +5,7 @@ import os
 import matplotlib.pyplot as plt
 
 class FFGC(torch.nn.Module):
-    def __init__(self, ng=256, alpha = 0.88, sigma = 1, rho = 1, norm = "l1"):
+    def __init__(self, ng=256, alpha = 0.225, sigma = 1.8, rho = 1, norm = "l1"):
         super().__init__()
         self.ng = ng
         self.alpha = alpha
