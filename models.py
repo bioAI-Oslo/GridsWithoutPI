@@ -169,6 +169,23 @@ class RNNGC(FFGC):
             g.append(self.recurrent_step(g[-1], v[:,i]))
         return torch.stack(g, dim = 1)
     
+    def prune_forward(self, inputs, v_mask, prune_start = 0):
+        with torch.no_grad():
+            r0, v = inputs
+            g = [self.norm_relu(self.rg(r0))] # initial state
+
+            # RNN 
+            for i in range(v.shape[1]):
+                if i >= prune_start:
+                    velocity_input = v_mask*self.vg(v[:,i])
+                else:
+                    velocity_input = self.vg(v[:,i])
+
+                h = self.gg(g[-1]) + velocity_input
+                g.append(self.norm_relu(h))
+        return torch.stack(g, dim = 1)
+
+    
     # def jacobi_CI_loss(self, r):
     #     m = self.metric_tensor(r)
     #     loss = torch.mean((self.rho*m - torch.eye(m.shape[-1], device = m.device))**2)

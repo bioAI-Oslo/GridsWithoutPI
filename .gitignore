@@ -164,3 +164,5 @@ cython_debug/
 /saved-models
 # exclude (possibly large) figures
 /figures 
+/graveyard
+/statistics
