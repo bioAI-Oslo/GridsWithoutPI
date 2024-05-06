@@ -9,6 +9,8 @@ def multiimshow(zz, figsize=(1,1), add_colorbar=True, rect=(0,0,1,0.87), axes_pa
     fig = plt.figure(figsize=figsize) if fig is None else fig
     if add_colorbar:
         grid = ImageGrid(fig, rect=rect, nrows_ncols=(nrows, ncols), axes_pad=axes_pad, cbar_mode='single', cbar_location='right', cbar_pad=0.1, cbar_size='5%')
+    else:
+        grid = ImageGrid(fig, rect=rect, nrows_ncols=(nrows, ncols), axes_pad=axes_pad)
     vmin, vmax = (np.nanmin(zz), np.nanmax(zz))
     if vrange == 'symmetric':
         vmax = max(abs(vmin), abs(vmax))
