@@ -161,7 +161,7 @@ cython_debug/
 
 
 # custom ignore
-/saved-models
+# /saved-models
 # exclude (possibly large) figures
 /figures 
 /graveyard
