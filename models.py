@@ -62,7 +62,7 @@ class FFGC(torch.nn.Module):
         dr = torch.nn.functional.pdist(r) # spatial distance
         # loss envelope function
         envelope = torch.exp(-dr**2/(2*self.sigma**2))
-        diff = (dg - dr)**2
+        diff = (dg - self.rho*dr)**2
         return torch.mean(diff*envelope)
 
     def capacity_loss(self, g):
